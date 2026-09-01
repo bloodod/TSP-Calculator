@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QRadioButton,
+    QTabWidget,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -38,6 +39,10 @@ from PyQt6.QtWidgets import (
 )
 
 from backend import Stream, StreamKind, StreamValidationError, TotalSiteProfile
+
+from .composite_page import CompositePage
+from .gcc_page import GccPage
+from .pta_page import PtaPage
 
 
 def _fmt(value: float) -> str:
@@ -54,6 +59,18 @@ def _parse_number(text: str, label: str) -> float:
     if not math.isfinite(value):
         raise ValueError(f"{label} must be a finite number")
     return value
+
+
+# Built-in demo data loaded by the Test button, as (tin, tout, cp).
+TEST_STREAMS = [
+    (200.0, 50.0, 10.0),  # hot
+    (150.0, 100.0, 50.0),  # hot
+    (120.0, 40.0, 20.0),  # hot
+    (10.0, 100.0, 10.0),  # cold
+    (70.0, 250.0, 20.0),  # cold
+    (40.0, 150.0, 15.0),  # cold
+
+]
 
 
 class MainWindow(QMainWindow):
@@ -84,17 +101,40 @@ class MainWindow(QMainWindow):
         self.title_label.setFont(QFont("Segoe UI", 20, QFont.Weight.Bold))
         root.addWidget(self.title_label)
 
-        body = QHBoxLayout()
-        body.setSpacing(12)
-        body.addWidget(self._build_input_panel(), 0)
-        body.addWidget(self._build_table_panel(), 1)
-        root.addLayout(body, 1)
+        self.tabs = QTabWidget()
+        self.tabs.addTab(self._build_streams_page(), "Streams")
+        self.composite_page = CompositePage()
+        self.tabs.addTab(self.composite_page, "Composite Curves")
+        self.pta_page = PtaPage()
+        self.tabs.addTab(self.pta_page, "Problem Table")
+        self.gcc_page = GccPage()
+        self.tabs.addTab(self.gcc_page, "GCC")
+        self.tabs.currentChanged.connect(self._on_tab_changed)
+        root.addWidget(self.tabs, 1)
 
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
 
+    def _build_streams_page(self) -> QWidget:
+        page = QWidget()
+        body = QHBoxLayout(page)
+        body.setSpacing(12)
+        body.addWidget(self._build_input_panel(), 0)
+        body.addWidget(self._build_table_panel(), 1)
+        return page
+
+    def _on_tab_changed(self, index: int) -> None:
+        widget = self.tabs.widget(index)
+        if widget is self.composite_page:
+            self.composite_page.refresh(self.tsp)
+        elif widget is self.pta_page:
+            self.pta_page.refresh(self.tsp)
+        elif widget is self.gcc_page:
+            self.gcc_page.refresh(self.tsp)
+
     def _build_input_panel(self) -> QGroupBox:
         box = QGroupBox("Stream input")
+        self.input_panel = box
         layout = QVBoxLayout(box)
         form = QFormLayout()
         form.setFieldGrowthPolicy(QFormLayout.FieldGrowthPolicy.AllNonFixedFieldsGrow)
@@ -114,13 +154,14 @@ class MainWindow(QMainWindow):
         duty_row = QHBoxLayout()
         self.energy_radio = QRadioButton("Total energy (kW)")
         self.cp_radio = QRadioButton("Heat cap. flow (kW/°C)")
-        self.energy_radio.setChecked(True)
+        self.cp_radio.setChecked(True)  # heat capacity flow is the default
         self.energy_radio.toggled.connect(self._update_duty_label)
+        self.cp_radio.toggled.connect(self._update_duty_label)
         duty_row.addWidget(self.energy_radio)
         duty_row.addWidget(self.cp_radio)
         form.addRow("Duty input:", duty_row)
 
-        self.duty_label = QLabel("Total energy (kW)")
+        self.duty_label = QLabel("Heat capacity flow rate (kW/°C)")
         self.duty_spin = QDoubleSpinBox()
         self.duty_spin.setRange(0.0, 1e9)
         self.duty_spin.setDecimals(2)
@@ -143,6 +184,14 @@ class MainWindow(QMainWindow):
         self.add_button.clicked.connect(self._on_add_clicked)
         layout.addWidget(self.add_button)
 
+        # Enter anywhere in the input panel adds the stream.
+        enter_shortcut = QShortcut(
+            QKeySequence(Qt.Key.Key_Return),
+            self.input_panel,
+            activated=self._on_add_clicked,
+        )
+        enter_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
@@ -158,6 +207,10 @@ class MainWindow(QMainWindow):
         layout.addLayout(dt_form)
 
         layout.addStretch(1)
+
+        self.test_button = QPushButton("Test")
+        self.test_button.clicked.connect(self._on_test_clicked)
+        layout.addWidget(self.test_button)
         return box
 
     def _build_table_panel(self) -> QGroupBox:
@@ -181,9 +234,24 @@ class MainWindow(QMainWindow):
         self.table.itemChanged.connect(self._on_cell_changed)
         layout.addWidget(self.table, 1)
 
+        button_row = QHBoxLayout()
         self.delete_button = QPushButton("Delete selected stream")
         self.delete_button.clicked.connect(self._on_delete_clicked)
-        layout.addWidget(self.delete_button)
+        button_row.addWidget(self.delete_button)
+
+        self.delete_all_button = QPushButton("Delete all streams")
+        self.delete_all_button.clicked.connect(self._on_delete_all_clicked)
+        button_row.addWidget(self.delete_all_button)
+
+        layout.addLayout(button_row)
+
+        # Enter on the focused delete button deletes the selected stream.
+        enter_shortcut = QShortcut(
+            QKeySequence(Qt.Key.Key_Return),
+            self.delete_button,
+            activated=self._on_delete_clicked,
+        )
+        enter_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
 
         delete_shortcut = QShortcut(
             QKeySequence.StandardKey.Delete, self.table, activated=self._on_delete_clicked
@@ -251,6 +319,24 @@ class MainWindow(QMainWindow):
         self._append_row(stream)
         self.statusBar().showMessage(f"Added {stream.name}", 3000)
         self._update_name_preview()
+        # Send focus back to the inlet temperature so the next stream can be
+        # typed immediately; the selected text is replaced by typing.
+        self.tin_spin.setFocus()
+        self.tin_spin.selectAll()
+
+    def _on_test_clicked(self) -> None:
+        """Load the built-in test streams, replacing the current list."""
+        self.tsp.clear_streams()
+        self.table.setRowCount(0)
+        for tin, tout, cp in TEST_STREAMS:
+            stream = Stream(tin=tin, tout=tout, cp=cp)
+            stream.name = self._next_stream_name(stream.kind)
+            self.tsp.add_stream(stream)
+            self._append_row(stream)
+        self.statusBar().showMessage(f"Loaded {len(TEST_STREAMS)} test streams", 3000)
+        self._update_name_preview()
+        self.tin_spin.setFocus()
+        self.tin_spin.selectAll()
 
     # ------------------------------------------------------------------
     # Table handling
@@ -341,4 +427,24 @@ class MainWindow(QMainWindow):
         self.tsp.remove_stream(stream)
         self.table.removeRow(row)
         self.statusBar().showMessage(f"Deleted {stream.name}", 3000)
+        self._update_name_preview()
+
+    def _on_delete_all_clicked(self) -> None:
+        if not self.tsp.streams:
+            QMessageBox.information(
+                self, "Delete all streams", "There are no streams to delete."
+            )
+            return
+        answer = QMessageBox.question(
+            self,
+            "Delete all streams",
+            f"Delete all {len(self.tsp.streams)} streams?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+        self.tsp.clear_streams()
+        self.table.setRowCount(0)
+        self.statusBar().showMessage("Deleted all streams", 3000)
         self._update_name_preview()

@@ -5,7 +5,9 @@ import os
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 import pytest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from frontend.main_window import MainWindow
 
@@ -19,6 +21,8 @@ def app():
 @pytest.fixture()
 def window(app):
     win = MainWindow()
+    win.show()
+    app.processEvents()
     yield win
     win.close()
 
@@ -154,3 +158,254 @@ class TestDeltaTMin:
     def test_delta_t_min_syncs_to_backend(self, window):
         window.dtmin_spin.setValue(10.0)
         assert window.tsp.delta_t_min == 10.0
+
+
+class TestCompositePage:
+    def test_switch_to_composite_tab_plots_curves(self, window):
+        _add(window, 100, 40, 600)  # hot
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.hot_curve is not None
+        assert window.composite_page.cold_curve is not None
+        assert window.composite_page.hot_curve.total_enthalpy == pytest.approx(600.0)
+        assert window.composite_page.cold_curve.total_enthalpy == pytest.approx(150.0)
+
+    def test_empty_profile_shows_placeholder(self, window):
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.hot_curve.enthalpy == ()
+        assert window.composite_page.cold_curve.enthalpy == ()
+
+    def test_refresh_after_stream_change(self, window):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.hot_curve.total_enthalpy == pytest.approx(600.0)
+        window.tabs.setCurrentIndex(0)
+        window.table.selectRow(0)
+        window.delete_button.click()
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.hot_curve.enthalpy == ()
+
+    def test_delta_t_min_shifts_cold_composite(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.dtmin_spin.setValue(10.0)
+        window.tabs.setCurrentIndex(1)
+        shifted = window.composite_page.cold_curve.shifted(10.0)
+        assert shifted.temperatures == (35.0, 95.0)
+
+
+class TestPtaPage:
+    def test_switch_to_pta_tab_builds_hot_table(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(2)
+        pt = window.pta_page.result
+        assert pt.kind == "hot"
+        assert pt.cascade[-1] == pytest.approx(600.0)
+
+    def test_combo_switches_to_combined(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.pta_page.refresh(window.tsp)
+        window.pta_page.kind_combo.setCurrentText("Combined")
+        pt = window.pta_page.result
+        assert pt.kind == "combined"
+        assert pt.min_hot_utility == 0.0
+        assert pt.min_cold_utility == pytest.approx(450.0)
+
+    def test_combo_switches_to_cold(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.pta_page.refresh(window.tsp)
+        window.pta_page.kind_combo.setCurrentText("Cold")
+        pt = window.pta_page.result
+        assert pt.kind == "cold"
+        assert pt.cascade[-1] == pytest.approx(150.0)
+
+    def test_empty_profile_shows_placeholder(self, window):
+        window.tabs.setCurrentIndex(2)
+        assert window.pta_page.result.intervals == ()
+
+
+class TestUtilityPlot:
+    def test_utilities_from_combined_pta(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        u = window.composite_page.utilities
+        assert u.min_hot == 0.0
+        assert u.min_cold == pytest.approx(450.0)
+        assert u.pinch_temperature == 100.0
+
+    def test_utilities_view_is_default(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        u = window.composite_page.utilities
+        assert u is not None
+        # The cold composite is shifted right by QC,min = 450 kW.
+        assert u.cold.enthalpy == (450.0, 600.0)
+        assert window.composite_page.hot_curve.total_enthalpy == pytest.approx(600.0)
+
+    def test_utilities_none_without_streams(self, window):
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.utilities is None
+
+    def test_plot_style_and_title(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.dtmin_spin.setValue(10.0)
+        window.tabs.setCurrentIndex(1)
+        ax = window.composite_page.figure.axes[0]
+        assert {line.get_marker() for line in ax.lines} == {"x", "o"}
+        assert "ΔT min of 10" in ax.get_title()
+
+    def test_arrow_anchors_on_higher_and_lower_curves(self, window):
+        _add(window, 100, 40, 600)  # hot, top 100 C
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold, top 85 C
+        window.tabs.setCurrentIndex(1)
+        u = window.composite_page.utilities
+        # The hot curve ends higher in temperature, the cold one lower.
+        assert window.composite_page._top_anchor(u) == (600.0, 100.0, True)
+        assert window.composite_page._bottom_anchor(u) == (450.0, 25.0, False)
+
+    def test_arrow_anchor_switches_when_cold_is_higher(self, window):
+        _add(window, 100, 40, 5.0, use_cp=True)  # hot 300 kW, top 100 C
+        _add(window, 85, 150, 10.0, use_cp=True)  # cold 650 kW, top 150 C
+        window.tabs.setCurrentIndex(1)
+        u = window.composite_page.utilities
+        assert u.min_hot == pytest.approx(575.0)
+        assert u.min_cold == pytest.approx(225.0)
+        # The cold curve is now the higher one, the hot curve the lower one:
+        # the QH,min arrow anchors on cold (points left), the QC,min arrow
+        # anchors on hot (points right).
+        assert window.composite_page._top_anchor(u) == (875.0, 150.0, False)
+        assert window.composite_page._bottom_anchor(u) == (0.0, 40.0, True)
+
+
+class TestGccPage:
+    def test_switch_to_gcc_tab_uses_combined_pta(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(3)
+        gcc = window.gcc_page.gcc
+        assert gcc is not None
+        assert gcc.min_hot == 0.0
+        assert gcc.min_cold == pytest.approx(450.0)
+        assert gcc.pinch_temperature == 100.0
+
+    def test_gcc_shifts_with_delta_t_min(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.dtmin_spin.setValue(10.0)
+        window.tabs.setCurrentIndex(3)
+        assert window.gcc_page.gcc.temperatures == (95.0, 90.0, 35.0, 30.0)
+
+    def test_gcc_empty_profile(self, window):
+        window.tabs.setCurrentIndex(3)
+        assert window.gcc_page.gcc is None
+
+
+class TestQualityOfLife:
+    def test_cp_is_default_duty_input(self, window):
+        assert window.cp_radio.isChecked()
+        assert not window.energy_radio.isChecked()
+        assert window.duty_label.text() == "Heat capacity flow rate (kW/°C)"
+
+    def test_add_returns_focus_to_inlet_temperature(self, window):
+        _add(window, 100, 40, 2.5, use_cp=True)
+        assert window.tin_spin.hasFocus()
+
+    def test_enter_in_input_panel_adds_stream(self, window):
+        window.tin_spin.setValue(100)
+        window.tout_spin.setValue(40)
+        window.duty_spin.setValue(2.5)
+        window.cp_radio.setChecked(True)
+        window.tin_spin.setFocus()
+        QTest.keyClick(window.tin_spin, Qt.Key.Key_Return)
+        assert window.table.rowCount() == 1
+        assert _cell_text(window, 0, 0) == "H1"
+        assert window.tin_spin.hasFocus()
+
+    def test_enter_on_delete_button_deletes(self, window):
+        _add(window, 100, 40, 600)
+        window.table.selectRow(0)
+        window.delete_button.setFocus()
+        QTest.keyClick(window.delete_button, Qt.Key.Key_Return)
+        assert window.table.rowCount() == 0
+
+
+class TestMoreButtons:
+    def test_button_loads_test_streams(self, window):
+        from frontend.main_window import TEST_STREAMS
+
+        window.test_button.click()
+        assert window.table.rowCount() == len(TEST_STREAMS)
+        # Names: H1..Hn for hot streams first, then C1..Cm for cold.
+        expected_names = []
+        counters = {"H": 0, "C": 0}
+        for tin, tout, _ in TEST_STREAMS:
+            key = "H" if tout < tin else "C"
+            counters[key] += 1
+            expected_names.append(f"{key}{counters[key]}")
+        names = [_cell_text(window, r, 0) for r in range(window.table.rowCount())]
+        assert names == expected_names
+        # Every row shows consistent values: Q = CP * |Tout - Tin|.
+        for r, (tin, tout, cp) in enumerate(TEST_STREAMS):
+            assert _cell_text(window, r, 2) == f"{tin:g}"
+            assert _cell_text(window, r, 3) == f"{tout:g}"
+            assert _cell_text(window, r, 5) == f"{cp:g}"
+            assert _cell_text(window, r, 4) == f"{cp * abs(tout - tin):g}"
+
+    def test_button_replaces_existing_streams(self, window):
+        from frontend.main_window import TEST_STREAMS
+
+        _add(window, 100, 40, 600)
+        assert window.table.rowCount() == 1
+        window.test_button.click()
+        assert window.table.rowCount() == len(TEST_STREAMS)
+        assert len(window.tsp) == len(TEST_STREAMS)
+
+    def test_button_loads_into_backend(self, window):
+        from frontend.main_window import TEST_STREAMS
+
+        window.test_button.click()
+        assert len(window.tsp) == len(TEST_STREAMS)
+        for stream, (tin, tout, cp) in zip(window.tsp.streams, TEST_STREAMS):
+            assert stream.tin == tin
+            assert stream.tout == tout
+            assert stream.cp == cp
+            assert stream.total_energy == pytest.approx(cp * abs(tout - tin))
+
+    def test_delete_all_clears_table_after_confirmation(self, window, monkeypatch):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        monkeypatch.setattr(
+            "frontend.main_window.QMessageBox.question",
+            lambda *a, **k: QMessageBox.StandardButton.Yes,
+        )
+        window.delete_all_button.click()
+        assert window.table.rowCount() == 0
+        assert len(window.tsp) == 0
+
+    def test_delete_all_aborts_when_declined(self, window, monkeypatch):
+        _add(window, 100, 40, 600)
+        answers = []
+        monkeypatch.setattr(
+            "frontend.main_window.QMessageBox.question",
+            lambda *a, **k: answers.append(a) or QMessageBox.StandardButton.No,
+        )
+        window.delete_all_button.click()
+        assert answers  # the confirmation was shown
+        assert window.table.rowCount() == 1
+        assert len(window.tsp) == 1
+
+    def test_delete_all_with_no_streams_shows_info(self, window, monkeypatch):
+        dialogs = []
+        monkeypatch.setattr(
+            "frontend.main_window.QMessageBox.information",
+            lambda *a, **k: dialogs.append(a),
+        )
+        window.delete_all_button.click()
+        assert dialogs
+        assert window.table.rowCount() == 0
