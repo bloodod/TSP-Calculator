@@ -21,6 +21,7 @@ from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QDoubleSpinBox,
+    QFileDialog,
     QFormLayout,
     QFrame,
     QGroupBox,
@@ -38,11 +39,19 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from backend import Stream, StreamKind, StreamValidationError, TotalSiteProfile
+from backend import (
+    Stream,
+    StreamKind,
+    StreamValidationError,
+    TotalSiteProfile,
+    load_profile,
+    save_profile,
+)
 
 from .composite_page import CompositePage
 from .gcc_page import GccPage
 from .pta_page import PtaPage
+from .sugcc_page import SugccPage
 from .tsp_page import TspPage
 
 
@@ -112,11 +121,24 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.gcc_page, "GCC")
         self.tsp_page = TspPage()
         self.tabs.addTab(self.tsp_page, "Total Site Profile")
+        self.tsp_page.sugcc_requested.connect(self._open_sugcc)
+        self.sugcc_page = SugccPage()
+        self.tabs.addTab(self.sugcc_page, "SUGCC")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         root.addWidget(self.tabs, 1)
 
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
+        self._build_menu()
+
+    def _build_menu(self) -> None:
+        file_menu = self.menuBar().addMenu("&File")
+        save_action = file_menu.addAction("&Save problem...")
+        save_action.setShortcut(QKeySequence.StandardKey.Save)
+        save_action.triggered.connect(self._on_save)
+        load_action = file_menu.addAction("&Load problem...")
+        load_action.setShortcut(QKeySequence.StandardKey.Open)
+        load_action.triggered.connect(self._on_load)
 
     def _build_streams_page(self) -> QWidget:
         page = QWidget()
@@ -136,6 +158,12 @@ class MainWindow(QMainWindow):
             self.gcc_page.refresh(self.tsp)
         elif widget is self.tsp_page:
             self.tsp_page.refresh(self.tsp)
+        elif widget is self.sugcc_page:
+            self.sugcc_page.refresh(self.tsp)
+
+    def _open_sugcc(self) -> None:
+        """Switch to the SUGCC tab, where the curve is already plotted."""
+        self.tabs.setCurrentWidget(self.sugcc_page)
 
     def _build_input_panel(self) -> QGroupBox:
         box = QGroupBox("Stream input")
@@ -452,4 +480,49 @@ class MainWindow(QMainWindow):
         self.tsp.clear_streams()
         self.table.setRowCount(0)
         self.statusBar().showMessage("Deleted all streams", 3000)
+        self._update_name_preview()
+
+    # ------------------------------------------------------------------
+    # Saving and loading
+    # ------------------------------------------------------------------
+
+    def _on_save(self) -> None:
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save problem", "", "TSP problem (*.json);;All files (*)"
+        )
+        if not path:
+            return
+        try:
+            save_profile(self.tsp, path)
+        except OSError as exc:
+            QMessageBox.warning(self, "Save failed", str(exc))
+            return
+        self.statusBar().showMessage(f"Saved to {path}", 5000)
+
+    def _on_load(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load problem", "", "TSP problem (*.json);;All files (*)"
+        )
+        if not path:
+            return
+        try:
+            loaded = load_profile(path)
+        except (OSError, ValueError) as exc:
+            QMessageBox.warning(self, "Load failed", str(exc))
+            return
+        self.tsp.clear_streams()
+        self.tsp.clear_utility_streams()
+        for stream in loaded.streams:
+            self.tsp.add_stream(stream)
+        for utility in loaded.utility_streams:
+            self.tsp.add_utility_stream(utility)
+        self._reload_streams_table()
+        for page in (self.composite_page, self.pta_page, self.gcc_page, self.tsp_page):
+            page.refresh(self.tsp)
+        self.statusBar().showMessage(f"Loaded from {path}", 5000)
+
+    def _reload_streams_table(self) -> None:
+        self.table.setRowCount(0)
+        for stream in self.tsp.streams:
+            self._append_row(stream)
         self._update_name_preview()

@@ -5,11 +5,18 @@ import pytest
 from backend import (
     Stream,
     StreamKind,
+    UtilityStream,
+    build_cogeneration_table,
     build_composite,
     build_gcc,
+    build_sugcc,
     build_tsp_curves,
     build_utility_targets,
+    cold_utility_staircase,
     enthalpy_at,
+    temperature_at,
+    tsp_shift_amount,
+    utility_staircase,
 )
 
 
@@ -191,6 +198,185 @@ class TestGrandCompositeCurve:
         assert gcc.pinch_temperature is None
         assert gcc.min_hot == 0.0
         assert gcc.min_cold == 0.0
+
+
+class TestUtilityStaircase:
+    def test_staircase_steps_along_hot_composite(self):
+        h1 = Stream(tin=200, tout=100, cp=2)
+        h2 = Stream(tin=60, tout=40, cp=10)
+        # Hot TSP curve: (40,-400), (60,-200), (100,-200), (200,0).
+        tsp = build_tsp_curves([h1, h2], 0.0)
+        steps = utility_staircase(tsp.hot, [25.0, 140.0, 250.0, 350.0])
+        # x(140) = -200 + 200 * (140 - 100) / 100 = -120
+        assert steps == [
+            (-400.0, 25.0),
+            (-120.0, 25.0),
+            (-120.0, 140.0),
+            (0.0, 140.0),
+            (0.0, 250.0),
+            (0.0, 350.0),
+        ]
+
+    def test_staircase_clamps_above_hot_composite_range(self):
+        h = Stream(tin=100, tout=40, cp=10)
+        # Hot TSP curve: (40,-600), (100,0).
+        tsp = build_tsp_curves([h], 0.0)
+        steps = utility_staircase(tsp.hot, [25.0, 140.0, 250.0, 350.0])
+        # All utility temps above the hot composite's range: everything
+        # clamps to energy 0, so only the vertical steps remain.
+        assert steps == [
+            (-600.0, 25.0),
+            (0.0, 25.0),
+            (0.0, 140.0),
+            (0.0, 250.0),
+            (0.0, 350.0),
+        ]
+
+    def test_staircase_empty(self):
+        tsp = build_tsp_curves([], 0.0)
+        assert utility_staircase(tsp.hot, [25.0]) == []
+        assert utility_staircase(tsp.hot, []) == []
+
+
+class TestColdUtilityStaircase:
+    def test_staircase_above_cold_composite(self):
+        # Cold composite from the test streams:
+        # (10,0),(40,300),(70,1050),(100,2400),(150,4150),(250,6150)
+        c1 = Stream(tin=10, tout=100, cp=10)
+        c2 = Stream(tin=70, tout=250, cp=20)
+        c3 = Stream(tin=40, tout=150, cp=15)
+        tsp = build_tsp_curves([c1, c2, c3], 0.0)
+        steps = cold_utility_staircase(
+            tsp.cold, [25.0, 50.0, 100.0, 150.0, 170.0, 200.0, 350.0]
+        )
+        assert steps == [
+            (0.0, 25.0), (0.0, 50.0), (550.0, 50.0), (550.0, 100.0),
+            (2400.0, 100.0), (2400.0, 150.0), (4150.0, 150.0), (4150.0, 170.0),
+            (4550.0, 170.0), (4550.0, 200.0), (5150.0, 200.0), (5150.0, 350.0),
+            (6150.0, 350.0),
+        ]
+
+    def test_staircase_horizontal_steps_are_above_the_curve(self):
+        c1 = Stream(tin=10, tout=100, cp=10)
+        c2 = Stream(tin=70, tout=250, cp=20)
+        c3 = Stream(tin=40, tout=150, cp=15)
+        tsp = build_tsp_curves([c1, c2, c3], 0.0)
+        steps = cold_utility_staircase(
+            tsp.cold, [25.0, 50.0, 100.0, 150.0, 170.0, 200.0, 350.0]
+        )
+        # Every step point sits at or above the cold composite temperature
+        # at the same energy.
+        for x, t in steps:
+            assert t >= temperature_at(tsp.cold, x) - 1e-9
+
+    def test_staircase_empty(self):
+        tsp = build_tsp_curves([], 0.0)
+        assert cold_utility_staircase(tsp.cold, [25.0]) == []
+        assert cold_utility_staircase(tsp.cold, []) == []
+
+
+class TestTspShift:
+    def test_shift_amount_is_shortest_vertical_gap(self):
+        h1 = Stream(tin=200, tout=50, cp=10)
+        h2 = Stream(tin=150, tout=100, cp=50)
+        h3 = Stream(tin=120, tout=40, cp=20)
+        c1 = Stream(tin=10, tout=100, cp=10)
+        c2 = Stream(tin=70, tout=250, cp=20)
+        c3 = Stream(tin=40, tout=150, cp=15)
+        tsp = build_tsp_curves([h1, h2, h3, c1, c2, c3], 0.0)
+        temps = [25.0, 50.0, 100.0, 150.0, 170.0, 200.0, 350.0]
+        hot_steps = utility_staircase(tsp.hot, temps)
+        cold_steps = cold_utility_staircase(tsp.cold, temps)
+        # Vertical gaps per interval: (25-50) 5400, (50-100) 4450,
+        # (100-150) 2900, (150-170) 4450, (170-200) 4550, (200-350) 5150.
+        assert tsp_shift_amount(hot_steps, cold_steps) == pytest.approx(2900.0)
+
+    def test_shift_none_without_common_verticals(self):
+        tsp = build_tsp_curves([], 0.0)
+        assert tsp_shift_amount([], []) is None
+        assert tsp_shift_amount([(0.0, 25.0), (0.0, 50.0)], []) is None
+        single = build_tsp_curves([Stream(tin=100, tout=40, cp=10)], 0.0)
+        temps = [25.0, 50.0]
+        hot_steps = utility_staircase(single.hot, temps)
+        assert tsp_shift_amount(hot_steps, []) is None
+
+
+class TestSugcc:
+    def test_segments_from_shifted_staircases(self):
+        h1 = Stream(tin=200, tout=50, cp=10)
+        h2 = Stream(tin=150, tout=100, cp=50)
+        h3 = Stream(tin=120, tout=40, cp=20)
+        c1 = Stream(tin=10, tout=100, cp=10)
+        c2 = Stream(tin=70, tout=250, cp=20)
+        c3 = Stream(tin=40, tout=150, cp=15)
+        tsp = build_tsp_curves([h1, h2, h3, c1, c2, c3], 0.0)
+        temps = [25.0, 50.0, 100.0, 150.0, 170.0, 200.0, 350.0]
+        hot_steps = utility_staircase(tsp.hot, temps)
+        cold_steps = cold_utility_staircase(tsp.cold, temps)
+        shift = tsp_shift_amount(hot_steps, cold_steps)
+        assert shift == pytest.approx(2900.0)
+        segments = build_sugcc(hot_steps, cold_steps, shift)
+        # Shifted gaps: 5400-2900, 4450-2900, 2900-2900, 4450-2900,
+        # 4550-2900, 5150-2900.
+        assert [(s.t_low, s.t_high, s.heat) for s in segments] == [
+            (25.0, 50.0, 2500.0),
+            (50.0, 100.0, 1550.0),
+            (100.0, 150.0, 0.0),
+            (150.0, 170.0, 1550.0),
+            (170.0, 200.0, 1650.0),
+            (200.0, 350.0, 2250.0),
+        ]
+        # The closest interval (100-150) touches: zero heat.
+        assert min(s.heat for s in segments) == 0.0
+
+    def test_sugcc_empty(self):
+        tsp = build_tsp_curves([], 0.0)
+        assert build_sugcc([], [], 0.0) == []
+
+
+class TestCogeneration:
+    def test_rows_from_test_data(self):
+        h1 = Stream(tin=200, tout=50, cp=10)
+        h2 = Stream(tin=150, tout=100, cp=50)
+        h3 = Stream(tin=120, tout=40, cp=20)
+        c1 = Stream(tin=10, tout=100, cp=10)
+        c2 = Stream(tin=70, tout=250, cp=20)
+        c3 = Stream(tin=40, tout=150, cp=15)
+        tsp = build_tsp_curves([h1, h2, h3, c1, c2, c3], 0.0)
+        temps = [25.0, 50.0, 100.0, 150.0, 170.0, 200.0, 350.0]
+        hot_steps = utility_staircase(tsp.hot, temps)
+        cold_steps = cold_utility_staircase(tsp.cold, temps)
+        shift = tsp_shift_amount(hot_steps, cold_steps)
+        segments = build_sugcc(hot_steps, cold_steps, shift)
+        utilities = [
+            UtilityStream("a", 25.0),
+            UtilityStream("b", 50.0),
+            UtilityStream("c", 100.0),
+            UtilityStream("d", 150.0),
+            UtilityStream("e", 170.0),
+            UtilityStream("f", 200.0),
+            UtilityStream("g", 350.0),
+        ]
+        rows = build_cogeneration_table(segments, utilities)
+        assert [(r.zone, r.delta_t, r.heat) for r in rows] == [
+            ("b/a", 25.0, 2500.0),
+            ("c/b", 50.0, 1550.0),
+            ("e/d", 20.0, 1550.0),
+            ("f/e", 30.0, 1650.0),
+            ("g/f", 150.0, 2250.0),
+        ]
+        # The zero-heat interval (100-150) is not an expansion zone.
+        assert "d/c" not in [r.zone for r in rows]
+        # g/f: W = 0.00133 * 150 * 2250 = 448.875 kW.
+        gf = rows[-1]
+        assert gf.zone == "g/f"
+        assert gf.delta_t == 150.0
+        assert gf.heat == 2250.0
+        assert gf.power == pytest.approx(448.875)
+        assert gf.power == pytest.approx(0.00133 * 150.0 * 2250.0)
+
+    def test_cogeneration_empty(self):
+        assert build_cogeneration_table([], []) == []
 
 
 class TestTspCurves:

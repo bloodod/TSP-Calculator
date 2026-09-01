@@ -1,0 +1,76 @@
+{
+  "streams": [
+    {
+      "name": "H1",
+      "tin": 200.0,
+      "tout": 50.0,
+      "energy": null,
+      "cp": 10.0
+    },
+    {
+      "name": "H2",
+      "tin": 150.0,
+      "tout": 100.0,
+      "energy": null,
+      "cp": 50.0
+    },
+    {
+      "name": "H3",
+      "tin": 120.0,
+      "tout": 40.0,
+      "energy": null,
+      "cp": 20.0
+    },
+    {
+      "name": "C1",
+      "tin": 10.0,
+      "tout": 100.0,
+      "energy": null,
+      "cp": 10.0
+    },
+    {
+      "name": "C2",
+      "tin": 70.0,
+      "tout": 250.0,
+      "energy": null,
+      "cp": 20.0
+    },
+    {
+      "name": "C3",
+      "tin": 40.0,
+      "tout": 150.0,
+      "energy": null,
+      "cp": 15.0
+    }
+  ],
+  "utility_streams": [
+    {
+      "name": "a",
+      "temperature": 25.0
+    },
+    {
+      "name": "b",
+      "temperature": 50.0
+    },
+    {
+      "name": "c",
+      "temperature": 100.0
+    },
+    {
+      "name": "d",
+      "temperature": 150.0
+    },
+    {
+      "name": "e",
+      "temperature": 170.0
+    },
+    {
+      "name": "f",
+      "temperature": 200.0
+    },
+    {
+      "name": "g",
+      "temperature": 350.0
+    }
+  ]
+}

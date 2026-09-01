@@ -16,9 +16,10 @@ heat released by the hot streams between T_min and T.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 
-from .streams import Stream, StreamKind
+from .streams import Stream, StreamKind, UtilityStream
 
 
 @dataclass(frozen=True)
@@ -124,6 +125,25 @@ def enthalpy_at(curve: CompositeCurve, temperature: float) -> float:
             frac = (temperature - temps[i]) / span
             return qs[i] + frac * (qs[i + 1] - qs[i])
     return qs[-1]
+
+
+def temperature_at(curve: CompositeCurve, enthalpy: float) -> float:
+    """Temperature of *curve* at *enthalpy* (linear interpolation, clamped)."""
+    temps, qs = curve.temperatures, curve.enthalpy
+    if not temps:
+        return 0.0
+    if enthalpy <= qs[0]:
+        return temps[0]
+    if enthalpy >= qs[-1]:
+        return temps[-1]
+    for i in range(len(qs) - 1):
+        if qs[i] <= enthalpy <= qs[i + 1]:
+            span = qs[i + 1] - qs[i]
+            if span <= 0:
+                return temps[i]
+            frac = (enthalpy - qs[i]) / span
+            return temps[i] + frac * (temps[i + 1] - temps[i])
+    return temps[-1]
 
 
 def build_utility_targets(
@@ -240,3 +260,192 @@ def build_tsp_curves(
             tuple(q - total for q in hot.enthalpy),
         )
     return TotalSiteProfileCurves(hot, cold)
+
+
+def utility_staircase(
+    hot_curve: CompositeCurve, utility_temperatures: list[float]
+) -> list[tuple[float, float]]:
+    """Staircase tracing the hot composite at the utility temperatures.
+
+    Starts at the hot curve's most negative energy at the lowest utility
+    temperature, then steps: horizontally at each utility temperature to the
+    energy where the hot composite reaches the next utility temperature,
+    then vertically up to it. Utility temperatures outside the hot
+    composite's range are clamped to its ends. Returns (energy, temperature)
+    points; zero-length horizontal steps are dropped.
+    """
+    temps = sorted(utility_temperatures)
+    if not temps or not hot_curve.enthalpy:
+        return []
+    t_min = hot_curve.temperatures[0]
+    t_max = hot_curve.temperatures[-1]
+    points: list[tuple[float, float]] = [(hot_curve.enthalpy[0], temps[0])]
+    for i in range(len(temps) - 1):
+        t_next = temps[i + 1]
+        if t_next <= t_min:
+            x_next = hot_curve.enthalpy[0]
+        elif t_next >= t_max:
+            x_next = hot_curve.enthalpy[-1]
+        else:
+            x_next = enthalpy_at(hot_curve, t_next)
+        if not math.isclose(x_next, points[-1][0]):
+            points.append((x_next, temps[i]))  # horizontal step
+        points.append((x_next, t_next))  # vertical step
+    return points
+
+
+def cold_utility_staircase(
+    cold_curve: CompositeCurve, utility_temperatures: list[float]
+) -> list[tuple[float, float]]:
+    """Staircase above the cold composite at the utility temperatures.
+
+    Starts at energy 0 at the lowest utility temperature, then steps:
+    vertically up at the current energy to the next utility temperature,
+    then horizontally to the right until it touches the cold composite at
+    that temperature. Because the cold composite rises in temperature with
+    energy, each horizontal step sits at or above the curve. Utility
+    temperatures outside the cold composite's range are clamped to its ends.
+    Returns (energy, temperature) points; zero-length horizontal steps are
+    dropped.
+    """
+    temps = sorted(utility_temperatures)
+    if not temps or not cold_curve.enthalpy:
+        return []
+    t_min = cold_curve.temperatures[0]
+    t_max = cold_curve.temperatures[-1]
+    points: list[tuple[float, float]] = [(0.0, temps[0])]
+    for i in range(len(temps) - 1):
+        t_next = temps[i + 1]
+        x_cur = points[-1][0]
+        points.append((x_cur, t_next))  # vertical step up
+        if t_next <= t_min:
+            x_next = cold_curve.enthalpy[0]
+        elif t_next >= t_max:
+            x_next = cold_curve.enthalpy[-1]
+        else:
+            x_next = enthalpy_at(cold_curve, t_next)
+        if not math.isclose(x_next, x_cur):
+            points.append((x_next, t_next))  # horizontal step to the curve
+    return points
+
+
+def _vertical_segments(
+    steps: list[tuple[float, float]]
+) -> dict[tuple[float, float], float]:
+    """Map (t_low, t_high) -> x for the vertical segments of a staircase."""
+    segments: dict[tuple[float, float], float] = {}
+    for (x1, t1), (x2, t2) in zip(steps, steps[1:]):
+        if math.isclose(x1, x2) and not math.isclose(t1, t2):
+            lo, hi = min(t1, t2), max(t1, t2)
+            segments[(lo, hi)] = x1
+    return segments
+
+
+def tsp_shift_amount(
+    hot_steps: list[tuple[float, float]],
+    cold_steps: list[tuple[float, float]],
+) -> float | None:
+    """Shortest horizontal distance between the two staircases' verticals.
+
+    For each temperature interval between consecutive utility temperatures
+    the hot staircase has a vertical segment and the cold staircase has one
+    (drawn at the energies where the respective composite reaches the
+    interval's temperatures). The gap is the energy difference between the
+    two verticals of the same interval. Returns the minimum gap -- the
+    amount the cold utility staircase must shift left so the closest
+    verticals touch -- or None when there are no common verticals.
+    """
+    hot_segs = _vertical_segments(hot_steps)
+    cold_segs = _vertical_segments(cold_steps)
+    common = set(hot_segs) & set(cold_segs)
+    if not common:
+        return None
+    return min(cold_segs[span] - hot_segs[span] for span in common)
+
+
+@dataclass(frozen=True)
+class SugccSegment:
+    """Net utility heat between two consecutive utility temperatures.
+
+    This is the horizontal distance between the cold and hot staircase
+    verticals of the interval once the cold staircase has been shifted left
+    by the TSP shift, i.e. the enclosed area width at that temperature level.
+    """
+
+    t_low: float  # C
+    t_high: float  # C
+    heat: float  # kW, >= 0
+
+
+def build_sugcc(
+    hot_steps: list[tuple[float, float]],
+    cold_steps: list[tuple[float, float]],
+    shift: float,
+) -> list[SugccSegment]:
+    """Net utility heat at each temperature interval after the TSP shift.
+
+    For every temperature interval between consecutive utility temperatures
+    the heat is the energy distance between the cold and hot staircase
+    verticals once the cold staircase moves left by *shift*, so the closest
+    interval has zero heat. Intervals are ordered by temperature.
+    """
+    hot_segs = _vertical_segments(hot_steps)
+    cold_segs = _vertical_segments(cold_steps)
+    spans = sorted(set(hot_segs) & set(cold_segs))
+    return [
+        SugccSegment(
+            t_low,
+            t_high,
+            max(0.0, cold_segs[(t_low, t_high)] - shift - hot_segs[(t_low, t_high)]),
+        )
+        for t_low, t_high in spans
+    ]
+
+
+CARNOT_FACTOR = 0.00133  # kW of power per (C of delta T * kW of heat)
+
+
+@dataclass(frozen=True)
+class CogenerationRow:
+    """One expansion zone of the cogeneration targets table."""
+
+    zone: str  # e.g. "g/f" (higher utility / lower utility)
+    t_low: float  # C
+    t_high: float  # C
+    delta_t: float  # C
+    heat: float  # Q, kW
+    power: float  # W, kW
+
+
+def build_cogeneration_table(
+    segments: list[SugccSegment],
+    utility_streams: list[UtilityStream],
+) -> list[CogenerationRow]:
+    """Cogeneration targets for each SUGCC expansion zone.
+
+    Only intervals with positive net heat form expansion zones. Each zone is
+    named after its bounding utilities (higher temperature / lower
+    temperature, e.g. "g/f") and the cogeneration target is the Carnot
+    factor times the temperature span times the net heat::
+
+        W = 0.00133 * delta T * Q
+    """
+    names = {u.temperature: u.name for u in utility_streams}
+    rows: list[CogenerationRow] = []
+    for seg in segments:
+        if seg.heat <= 1e-9:
+            continue
+        delta_t = seg.t_high - seg.t_low
+        name_high = names.get(seg.t_high, f"{seg.t_high:g}")
+        name_low = names.get(seg.t_low, f"{seg.t_low:g}")
+        rows.append(
+            CogenerationRow(
+                zone=f"{name_high}/{name_low}",
+                t_low=seg.t_low,
+                t_high=seg.t_high,
+                delta_t=delta_t,
+                heat=seg.heat,
+                power=CARNOT_FACTOR * delta_t * seg.heat,
+            )
+        )
+    return rows
