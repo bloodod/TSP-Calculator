@@ -100,6 +100,17 @@ class Stream:
         return StreamKind.COLD if self.tout > self.tin else StreamKind.HOT
 
 
+@dataclass
+class UtilityStream:
+    """A utility stream (hot or cold utility) at a fixed temperature."""
+
+    name: str
+    temperature: float  # C
+
+    def __post_init__(self) -> None:
+        _require_finite("utility temperature", self.temperature)
+
+
 def _require_finite(label: str, value: float) -> None:
     if (
         isinstance(value, bool)

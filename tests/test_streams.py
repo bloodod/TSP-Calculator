@@ -2,7 +2,18 @@
 
 import pytest
 
-from backend.streams import Stream, StreamKind, StreamValidationError
+from backend.streams import Stream, StreamKind, StreamValidationError, UtilityStream
+
+
+class TestUtilityStream:
+    def test_utility_stream(self):
+        u = UtilityStream(name="HP steam", temperature=250.0)
+        assert u.name == "HP steam"
+        assert u.temperature == 250.0
+
+    def test_non_finite_temperature_rejected(self):
+        with pytest.raises(StreamValidationError):
+            UtilityStream(name="CW", temperature=float("nan"))
 
 
 class TestEnergyToCp:

@@ -3,15 +3,17 @@
 from .composite import (
     CompositeCurve,
     GrandCompositeCurve,
+    TotalSiteProfileCurves,
     UtilityTargets,
     build_composite,
     build_gcc,
+    build_tsp_curves,
     build_utility_targets,
     enthalpy_at,
 )
 from .project import ProjectValidationError, TotalSiteProfile
 from .pta import ProblemTable, PtaInterval, problem_table
-from .streams import Stream, StreamKind, StreamValidationError
+from .streams import Stream, StreamKind, StreamValidationError, UtilityStream
 
 __all__ = [
     "CompositeCurve",
@@ -23,9 +25,12 @@ __all__ = [
     "StreamKind",
     "StreamValidationError",
     "TotalSiteProfile",
+    "TotalSiteProfileCurves",
+    "UtilityStream",
     "UtilityTargets",
     "build_composite",
     "build_gcc",
+    "build_tsp_curves",
     "build_utility_targets",
     "enthalpy_at",
     "problem_table",

@@ -7,6 +7,7 @@ from backend import (
     StreamKind,
     build_composite,
     build_gcc,
+    build_tsp_curves,
     build_utility_targets,
     enthalpy_at,
 )
@@ -190,3 +191,24 @@ class TestGrandCompositeCurve:
         assert gcc.pinch_temperature is None
         assert gcc.min_hot == 0.0
         assert gcc.min_cold == 0.0
+
+
+class TestTspCurves:
+    def test_cold_positive_hot_negative(self):
+        h = Stream(tin=100, tout=40, cp=10)  # 600 kW
+        c = Stream(tin=25, tout=85, cp=2.5)  # 150 kW
+        tsp = build_tsp_curves([h, c], 0.0)
+        # Both curves start at energy 0: hot at its highest temperature on
+        # the negative side, cold at its lowest temperature on the positive
+        # side (plain composites, no utility shift).
+        assert tsp.hot.enthalpy == (-600.0, 0.0)
+        assert tsp.cold.enthalpy == (0.0, 150.0)
+        assert all(q <= 0 for q in tsp.hot.enthalpy)
+        assert all(q >= 0 for q in tsp.cold.enthalpy)
+        assert tsp.hot.temperatures == (40.0, 100.0)
+        assert tsp.cold.temperatures == (25.0, 85.0)
+
+    def test_tsp_empty_streams(self):
+        tsp = build_tsp_curves([], 0.0)
+        assert tsp.hot.enthalpy == ()
+        assert tsp.cold.enthalpy == ()

@@ -10,7 +10,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
-from .streams import Stream
+from .streams import Stream, UtilityStream
 
 
 class ProjectValidationError(ValueError):
@@ -23,6 +23,7 @@ class TotalSiteProfile:
 
     delta_t_min: float = 0.0
     streams: list[Stream] = field(default_factory=list)
+    utility_streams: list[UtilityStream] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if (
@@ -52,6 +53,21 @@ class TotalSiteProfile:
     def clear_streams(self) -> None:
         """Remove all streams."""
         self.streams.clear()
+
+    # -- utility stream list helpers ------------------------------------
+
+    def add_utility_stream(self, utility: UtilityStream) -> UtilityStream:
+        """Append *utility* to the profile and return it."""
+        self.utility_streams.append(utility)
+        return utility
+
+    def remove_utility_stream(self, utility: UtilityStream) -> None:
+        """Remove *utility* from the profile (raises if not present)."""
+        self.utility_streams.remove(utility)
+
+    def clear_utility_streams(self) -> None:
+        """Remove all utility streams."""
+        self.utility_streams.clear()
 
     def __len__(self) -> int:
         return len(self.streams)

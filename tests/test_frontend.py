@@ -306,6 +306,62 @@ class TestGccPage:
         assert window.gcc_page.gcc is None
 
 
+class TestTspPage:
+    def test_switch_to_tsp_tab(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(4)
+        curves = window.tsp_page.curves
+        assert curves is not None
+        # Hot: negative side, ends at 0 at its highest temperature.
+        assert curves.hot.enthalpy == (-600.0, 0.0)
+        # Cold: positive side, starts at 0 at its lowest temperature.
+        assert curves.cold.enthalpy == (0.0, 150.0)
+
+    def test_tsp_plot_hot_negative_cold_positive(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(4)
+        ax = window.tsp_page.figure.axes[0]
+        # Exclude the zero-axis vline; keep the two composite curve lines.
+        lines = [line for line in ax.lines if line.get_marker() in ("x", "o")]
+        assert len(lines) == 2
+        hot, cold = sorted(lines, key=lambda line: min(line.get_xdata()))
+        assert max(hot.get_xdata()) <= 0.0  # hot on the negative side
+        assert min(cold.get_xdata()) >= 0.0  # cold on the positive side
+        assert {line.get_marker() for line in lines} == {"x", "o"}
+
+    def test_tsp_empty_profile(self, window):
+        window.tabs.setCurrentIndex(4)
+        assert window.tsp_page.curves is None
+
+
+class TestTspUtilities:
+    def test_add_utility_stream(self, window):
+        window.tabs.setCurrentIndex(4)
+        page = window.tsp_page
+        page.utility_name_edit.setText("HP steam")
+        page.utility_temp_spin.setValue(250.0)
+        page.utility_add_button.click()
+        assert page.utility_table.rowCount() == 1
+        assert page.utility_table.item(0, 0).text() == "HP steam"
+        assert page.utility_table.item(0, 1).text() == "250"
+        assert len(window.tsp.utility_streams) == 1
+        assert window.tsp.utility_streams[0].name == "HP steam"
+        assert window.tsp.utility_streams[0].temperature == 250.0
+
+    def test_add_multiple_utility_streams(self, window):
+        window.tabs.setCurrentIndex(4)
+        page = window.tsp_page
+        for name, temp in [("HP steam", 250.0), ("CW", 25.0)]:
+            page.utility_name_edit.setText(name)
+            page.utility_temp_spin.setValue(temp)
+            page.utility_add_button.click()
+        assert page.utility_table.rowCount() == 2
+        assert [u.name for u in window.tsp.utility_streams] == ["HP steam", "CW"]
+        assert [u.temperature for u in window.tsp.utility_streams] == [250.0, 25.0]
+
+
 class TestQualityOfLife:
     def test_cp_is_default_duty_input(self, window):
         assert window.cp_radio.isChecked()

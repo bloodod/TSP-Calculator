@@ -3,7 +3,20 @@
 import pytest
 
 from backend.project import ProjectValidationError, TotalSiteProfile
-from backend.streams import Stream
+from backend.streams import Stream, UtilityStream
+
+
+def test_utility_streams_add_remove_clear():
+    tsp = TotalSiteProfile()
+    u1 = UtilityStream(name="HP steam", temperature=250.0)
+    u2 = UtilityStream(name="CW", temperature=25.0)
+    tsp.add_utility_stream(u1)
+    tsp.add_utility_stream(u2)
+    assert len(tsp.utility_streams) == 2
+    tsp.remove_utility_stream(u1)
+    assert tsp.utility_streams == [u2]
+    tsp.clear_utility_streams()
+    assert tsp.utility_streams == []
 
 
 def test_delta_t_min_defaults_to_zero():

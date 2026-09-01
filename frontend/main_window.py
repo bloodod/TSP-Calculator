@@ -43,6 +43,7 @@ from backend import Stream, StreamKind, StreamValidationError, TotalSiteProfile
 from .composite_page import CompositePage
 from .gcc_page import GccPage
 from .pta_page import PtaPage
+from .tsp_page import TspPage
 
 
 def _fmt(value: float) -> str:
@@ -109,6 +110,8 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self.pta_page, "Problem Table")
         self.gcc_page = GccPage()
         self.tabs.addTab(self.gcc_page, "GCC")
+        self.tsp_page = TspPage()
+        self.tabs.addTab(self.tsp_page, "Total Site Profile")
         self.tabs.currentChanged.connect(self._on_tab_changed)
         root.addWidget(self.tabs, 1)
 
@@ -131,6 +134,8 @@ class MainWindow(QMainWindow):
             self.pta_page.refresh(self.tsp)
         elif widget is self.gcc_page:
             self.gcc_page.refresh(self.tsp)
+        elif widget is self.tsp_page:
+            self.tsp_page.refresh(self.tsp)
 
     def _build_input_panel(self) -> QGroupBox:
         box = QGroupBox("Stream input")

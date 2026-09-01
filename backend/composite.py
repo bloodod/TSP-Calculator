@@ -204,3 +204,39 @@ def build_gcc(streams: list[Stream], delta_t_min: float = 0.0) -> GrandComposite
     if not pt.levels:
         return GrandCompositeCurve((), ())
     return GrandCompositeCurve(pt.cascade, pt.levels)
+
+
+@dataclass(frozen=True)
+class TotalSiteProfileCurves:
+    """Hot and cold composite curves in the Total Site Profile convention.
+
+    Both curves start at energy 0: ``cold`` at its lowest temperature on the
+    positive side of the energy axis, ``hot`` at its highest temperature on
+    the negative side (enthalpy <= 0). They are the plain composites, with
+    no utility shifts applied.
+    """
+
+    hot: CompositeCurve  # enthalpy <= 0, starts at 0 at the highest T
+    cold: CompositeCurve  # enthalpy >= 0, starts at 0 at the lowest T
+
+
+def build_tsp_curves(
+    streams: list[Stream], delta_t_min: float = 0.0
+) -> TotalSiteProfileCurves:
+    """Total site profile curves: cold positive, hot negated.
+
+    The cold composite is used as-is (starting at energy 0 at its lowest
+    temperature). The hot composite is negated and mirrored so it also
+    starts at energy 0, at its highest temperature, and accumulates
+    negatively toward its lowest temperature.
+    """
+    hot = build_composite(streams, StreamKind.HOT)
+    cold = build_composite(streams, StreamKind.COLD)
+    if hot.enthalpy:
+        total = hot.total_enthalpy
+        hot = CompositeCurve(
+            hot.kind,
+            hot.temperatures,
+            tuple(q - total for q in hot.enthalpy),
+        )
+    return TotalSiteProfileCurves(hot, cold)
