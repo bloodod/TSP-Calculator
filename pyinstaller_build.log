@@ -1,0 +1,135 @@
+400 INFO: PyInstaller: 6.22.2, contrib hooks: 2026.7
+401 INFO: Python: 3.11.16
+432 INFO: Platform: Windows-10-10.0.26200-SP0
+432 INFO: Python environment: C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\.venv
+434 INFO: wrote C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\TSP.spec
+442 INFO: Removing temporary files and cleaning cache in C:\Users\yrham\AppData\Local\pyinstaller
+475 INFO: Module search paths (PYTHONPATH):
+['C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Scripts\\pyinstaller.exe',
+ 'C:\\Users\\yrham\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none\\python311.zip',
+ 'C:\\Users\\yrham\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none\\DLLs',
+ 'C:\\Users\\yrham\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none\\Lib',
+ 'C:\\Users\\yrham\\AppData\\Roaming\\uv\\python\\cpython-3.11-windows-x86_64-none',
+ 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv',
+ 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages',
+ 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP']
+1406 INFO: Appending 'datas' from .spec
+1407 INFO: checking Analysis
+1407 INFO: Building Analysis because Analysis-00.toc is non existent
+1407 INFO: Looking for Python shared library...
+1408 INFO: Using Python shared library: C:\Users\yrham\AppData\Roaming\uv\python\cpython-3.11-windows-x86_64-none\python311.dll
+1408 INFO: Running Analysis Analysis-00.toc
+1408 INFO: Target bytecode optimization level: 0
+1408 INFO: Initializing module dependency graph...
+1412 INFO: Initializing module graph hook caches...
+1450 INFO: Analyzing modules for base_library.zip ...
+3448 INFO: Processing standard module hook 'hook-encodings.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+4911 INFO: Processing standard module hook 'hook-heapq.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7139 INFO: Processing standard module hook 'hook-math.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+7327 INFO: Processing standard module hook 'hook-pickle.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+10053 INFO: Caching module dependency graph...
+10124 INFO: Analyzing C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\main.py
+10130 INFO: Processing standard module hook 'hook-PyQt6.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+11364 INFO: Processing standard module hook 'hook-PyQt6.QtGui.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+30137 INFO: Processing standard module hook 'hook-PyQt6.QtCore.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+37264 INFO: Processing standard module hook 'hook-PyQt6.QtWidgets.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+43241 INFO: Processing standard module hook 'hook-matplotlib.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+44170 INFO: Processing pre-safe-import-module hook 'hook-packaging.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+44175 INFO: SetuptoolsInfo: initializing cached setuptools info...
+51790 INFO: Processing pre-safe-import-module hook 'hook-typing_extensions.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+51793 INFO: Setuptools: 'typing_extensions' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.typing_extensions'!
+51805 INFO: Processing standard module hook 'hook-setuptools.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+51872 INFO: Processing standard module hook 'hook-platform.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+51879 INFO: Processing pre-safe-import-module hook 'hook-distutils.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+51881 INFO: Processing pre-find-module-path hook 'hook-distutils.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+52639 INFO: Processing standard module hook 'hook-distutils.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+52678 INFO: Processing standard module hook 'hook-distutils.util.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+52751 INFO: Processing standard module hook 'hook-sysconfig.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+52798 INFO: Processing standard module hook 'hook-_osx_support.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+53092 INFO: Processing standard module hook 'hook-_ctypes.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+53261 INFO: Processing pre-safe-import-module hook 'hook-jaraco.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+53264 INFO: Setuptools: 'jaraco' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.jaraco'!
+53281 INFO: Processing standard module hook 'hook-setuptools._vendor.jaraco.text.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+53285 INFO: Processing pre-safe-import-module hook 'hook-importlib_resources.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+53302 INFO: Processing pre-safe-import-module hook 'hook-more_itertools.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+53303 INFO: Setuptools: 'more_itertools' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.more_itertools'!
+54027 INFO: Processing pre-safe-import-module hook 'hook-backports.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+54029 INFO: Setuptools: 'backports' appears to be a full setuptools-vendored copy - creating alias to 'setuptools._vendor.backports'!
+54359 INFO: Processing pre-safe-import-module hook 'hook-importlib_metadata.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+54360 INFO: Setuptools: 'importlib_metadata' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.importlib_metadata'!
+54399 INFO: Processing standard module hook 'hook-setuptools._vendor.importlib_metadata.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+54404 INFO: Processing pre-safe-import-module hook 'hook-zipp.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+54406 INFO: Setuptools: 'zipp' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.zipp'!
+55031 INFO: Processing pre-safe-import-module hook 'hook-tomli.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+55033 INFO: Setuptools: 'tomli' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.tomli'!
+55800 INFO: Processing standard module hook 'hook-pkg_resources.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+56657 INFO: Processing standard module hook 'hook-xml.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+56663 INFO: Processing pre-safe-import-module hook 'hook-platformdirs.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+56664 INFO: Setuptools: 'platformdirs' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.platformdirs'!
+57057 INFO: Processing pre-safe-import-module hook 'hook-wheel.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+57059 INFO: Setuptools: 'wheel' appears to be a setuptools-vendored copy - creating alias to 'setuptools._vendor.wheel'!
+57616 INFO: Processing standard module hook 'hook-difflib.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+57768 INFO: Processing standard module hook 'hook-numpy.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+58936 INFO: Processing standard module hook 'hook-multiprocessing.util.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+61609 INFO: Processing standard module hook 'hook-webbrowser.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+64325 INFO: Processing standard module hook 'hook-matplotlib.backend_bases.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+64579 INFO: Processing standard module hook 'hook-PIL.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+64744 INFO: Processing standard module hook 'hook-PIL.Image.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+65741 INFO: Processing standard module hook 'hook-xml.etree.cElementTree.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+66012 INFO: Processing standard module hook 'hook-PIL.ImageFilter.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+67775 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+67920 INFO: Processing standard module hook 'hook-matplotlib.pyplot.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+68172 INFO: Processing standard module hook 'hook-matplotlib.figure.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+69722 INFO: Processing standard module hook 'hook-dateutil.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\_pyinstaller_hooks_contrib\\stdhooks'
+70086 INFO: Processing pre-safe-import-module hook 'hook-six.moves.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+73373 INFO: Processing pre-safe-import-module hook 'hook-gi.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_safe_import_module'
+73394 INFO: Processing standard module hook 'hook-matplotlib.backends.backend_qtagg.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+73404 INFO: Processing standard module hook 'hook-matplotlib.backends.qt_compat.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+73406 INFO: hook-matplotlib.backends.qt_compat: selected 'PyQt6' as Qt bindings because hook for 'PyQt6' has been run before.
+73418 INFO: Processing standard module hook 'hook-PyQt6.QtSvg.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+74857 INFO: Processing module hooks (post-graph stage)...
+74876 INFO: Processing standard module hook 'hook-matplotlib.backends.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+74877 INFO: Matplotlib backend selection method: automatic discovery of used backends
+75741 INFO: Trying determine the default backend as first importable candidate from the list: ['QtAgg', 'Qt5Agg', 'Gtk4Agg', 'Gtk3Agg', 'TkAgg', 'WxAgg']
+78000 INFO: Selected matplotlib backends: ['QtAgg']
+78000 INFO: Extra dists for selected matplotlib backends: []
+78506 INFO: Processing standard module hook 'hook-PIL.SpiderImagePlugin.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+79734 INFO: Performing binary vs. data reclassification (331 entries)
+80014 INFO: Looking for ctypes DLLs
+80222 INFO: Analyzing run-time hooks ...
+80229 INFO: Including run-time hook 'pyi_rth_inspect.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80234 INFO: Including run-time hook 'pyi_rth_pkgutil.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80239 INFO: Including run-time hook 'pyi_rth_multiprocessing.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80243 INFO: Including run-time hook 'pyi_rth_setuptools.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80245 INFO: Including run-time hook 'pyi_rth_pkgres.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80253 INFO: Including run-time hook 'pyi_rth_mplconfig.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80257 INFO: Processing pre-find-module-path hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\pre_find_module_path'
+80262 INFO: Processing standard module hook 'hook-_pyi_rth_utils.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks'
+80279 INFO: Including run-time hook 'pyi_rth_pyqt6.py' from 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyInstaller\\hooks\\rthooks'
+80369 INFO: Creating base_library.zip...
+80406 INFO: Looking for dynamic libraries
+82817 INFO: Extra DLL search directories (AddDllDirectory): ['C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyQt6\\Qt6\\bin', 'C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\numpy.libs']
+82817 INFO: Extra DLL search directories (PATH): ['C:\\Users\\yrham\\.kun\\default_workspace\\New_TSP\\Try_TSP\\.venv\\Lib\\site-packages\\PyQt6\\Qt6\\bin']
+85896 INFO: Warnings written to C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\build\TSP\warn-TSP.txt
+86094 INFO: Graph cross-reference written to C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\build\TSP\xref-TSP.html
+86171 INFO: checking PYZ
+86172 INFO: Building PYZ because PYZ-00.toc is non existent
+86172 INFO: Building PYZ (ZlibArchive) C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\build\TSP\PYZ-00.pyz
+88002 INFO: Building PYZ (ZlibArchive) C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\build\TSP\PYZ-00.pyz completed successfully.
+88056 INFO: checking PKG
+88057 INFO: Building PKG because PKG-00.toc is non existent
+88057 INFO: Building PKG (CArchive) TSP.pkg
+118398 INFO: Building PKG (CArchive) TSP.pkg completed successfully.
+118418 INFO: Bootloader C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\.venv\Lib\site-packages\PyInstaller\bootloader\Windows-64bit-intel\runw.exe
+118418 INFO: checking EXE
+118418 INFO: Building EXE because EXE-00.toc is non existent
+118418 INFO: Building EXE from EXE-00.toc
+118420 INFO: Copying bootloader EXE to C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\dist\TSP.exe
+118534 INFO: Copying icon to EXE
+118616 INFO: Copying 0 resources to EXE
+118616 INFO: Embedding manifest in EXE
+118713 INFO: Appending PKG archive to EXE
+118979 INFO: Fixing EXE headers
+119906 INFO: Building EXE from EXE-00.toc completed successfully.
+119925 INFO: Build complete! The results are available in: C:\Users\yrham\.kun\default_workspace\New_TSP\Try_TSP\dist
+EXIT_CODE=0
