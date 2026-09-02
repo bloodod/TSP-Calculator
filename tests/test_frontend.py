@@ -161,6 +161,30 @@ class TestDeltaTMin:
 
 
 class TestCompositePage:
+    def test_points_table_column_headers(self, window):
+        table = window.composite_page.points_table
+        headers = [table.horizontalHeaderItem(c).text() for c in range(2)]
+        assert headers == ["Enthalpy (kW)", "Temperature (\u00b0C)"]
+
+    def test_points_table_lists_curve_vertices_by_section(self, window):
+        _add(window, 100, 40, 600)  # hot
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold
+        window.tabs.setCurrentIndex(1)
+        table = window.composite_page.points_table
+        x = [table.item(r, 0).text() for r in range(table.rowCount())]
+        y = [
+            table.item(r, 1).text() if table.item(r, 1) is not None else ""
+            for r in range(table.rowCount())
+        ]
+        # One section per composite; vertices (x, y): hot (0,40)-(600,100),
+        # cold shifted by QC,min = 450: (450,25)-(600,85).
+        assert x == ["HOT COMPOSITE", "0", "600", "COLD COMPOSITE", "450", "600"]
+        assert y == ["", "40", "100", "", "25", "85"]
+
+    def test_points_table_clears_without_streams(self, window):
+        window.tabs.setCurrentIndex(1)
+        assert window.composite_page.points_table.rowCount() == 0
+
     def test_switch_to_composite_tab_plots_curves(self, window):
         _add(window, 100, 40, 600)  # hot
         _add(window, 25, 85, 2.5, use_cp=True)  # cold
@@ -227,6 +251,15 @@ class TestPtaPage:
         assert window.pta_page.result.intervals == ()
 
 
+def _arrow_patches(ax):
+    """The FancyArrowPatch objects behind arrow-style annotations."""
+    return [
+        t.arrow_patch
+        for t in ax.texts
+        if getattr(t, "arrow_patch", None) is not None
+    ]
+
+
 class TestUtilityPlot:
     def test_utilities_from_combined_pta(self, window):
         _add(window, 100, 40, 600)
@@ -282,8 +315,109 @@ class TestUtilityPlot:
         assert window.composite_page._top_anchor(u) == (875.0, 150.0, False)
         assert window.composite_page._bottom_anchor(u) == (0.0, 40.0, True)
 
+    def test_utility_arrows_toggle_defaults_on_composite_only(self, window):
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        assert controls.utilities_check.isChecked()
+        assert controls.utilities_enabled()
+        # Only the composite page offers the arrows; the GCC figure controls
+        # do not.
+        assert not hasattr(window.gcc_page.controls, "utilities_check")
+
+    def test_arrow_labels_dark_grey(self, window):
+        from matplotlib.colors import to_hex
+
+        _add(window, 100, 40, 5.0, use_cp=True)  # hot 300 kW
+        _add(window, 85, 150, 10.0, use_cp=True)  # cold 650 kW
+        window.tabs.setCurrentIndex(1)
+        ax = window.composite_page.figure.axes[0]
+        arrows = _arrow_patches(ax)
+        assert len(arrows) == 2  # QH,min and QC,min
+        assert all(to_hex(p.get_edgecolor()) == "#404040" for p in arrows)
+        labels = [t for t in ax.texts
+                  if t.get_text().startswith(("QH,min", "QC,min"))]
+        assert all(to_hex(t.get_color()) == "#404040" for t in labels)
+
+    def test_arrow_label_side_follows_anchor_composite(self, window):
+        _add(window, 100, 40, 5.0, use_cp=True)  # hot 300 kW, top 100 C
+        _add(window, 85, 150, 10.0, use_cp=True)  # cold 650 kW, top 150 C
+        window.tabs.setCurrentIndex(1)
+        page = window.composite_page
+        u = page.utilities
+        ax = page.figure.axes[0]
+        labels = {t.get_text(): t for t in ax.texts
+                  if t.get_text().startswith(("QH,min", "QC,min"))}
+        qh = labels[f"QH,min = {u.min_hot:g} kW"]
+        qc = labels[f"QC,min = {u.min_cold:g} kW"]
+        # QH,min anchors on the cold composite (top, 150 C): label below.
+        assert page._top_anchor(u)[2] is False
+        assert qh.get_position()[1] < 150.0
+        assert qh.get_va() == "top"
+        # QC,min anchors on the hot composite (bottom, 40 C): label below.
+        assert page._bottom_anchor(u)[2] is True
+        assert qc.get_position()[1] < 40.0
+        assert qc.get_va() == "top"
+
+    def test_qc_label_above_when_anchored_on_cold(self, window):
+        _add(window, 100, 40, 600)  # hot, top 100 C
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold, bottom 25 C
+        window.tabs.setCurrentIndex(1)
+        page = window.composite_page
+        ax = page.figure.axes[0]
+        labels = [t for t in ax.texts
+                  if t.get_text().startswith(("QH,min", "QC,min"))]
+        # No hot utility is needed here: only the QC,min arrow is drawn.
+        assert [t.get_text() for t in labels] == ["QC,min = 450 kW"]
+        qc = labels[0]
+        # QC,min anchors on the cold composite (bottom, 25 C): label above.
+        assert page._bottom_anchor(page.utilities)[2] is False
+        assert qc.get_position()[1] > 25.0
+        assert qc.get_va() == "bottom"
+
+    def test_utility_arrows_can_be_hidden_and_restored(self, window, app):
+        _add(window, 100, 40, 5.0, use_cp=True)
+        _add(window, 85, 150, 10.0, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        page = window.composite_page
+        controls = page.controls
+
+        def state():
+            ax = page.figure.axes[0]
+            arrows = _arrow_patches(ax)
+            labels = [t for t in ax.texts
+                      if t.get_text().startswith(("QH,min", "QC,min"))]
+            return arrows, labels
+
+        assert [len(x) for x in state()] == [2, 2]
+        controls.utilities_check.setChecked(False)
+        app.processEvents()
+        assert [len(x) for x in state()] == [0, 0]
+        # The curves themselves (with their point markers) stay visible.
+        ax = page.figure.axes[0]
+        assert any(line.get_marker() in ("x", "o") for line in ax.lines)
+        controls.utilities_check.setChecked(True)
+        app.processEvents()
+        assert [len(x) for x in state()] == [2, 2]
+
 
 class TestGccPage:
+    def test_points_table_lists_gcc_points(self, window):
+        _add(window, 100, 40, 600)  # hot
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold
+        window.tabs.setCurrentIndex(3)
+        table = window.gcc_page.points_table
+        headers = [table.horizontalHeaderItem(c).text() for c in range(2)]
+        assert headers == ["Enthalpy (kW)", "Temperature (\u00b0C)"]
+        gcc = window.gcc_page.gcc
+        x = [table.item(r, 0).text() for r in range(table.rowCount())]
+        y = [table.item(r, 1).text() for r in range(table.rowCount())]
+        assert x == [f"{v:g}" for v in gcc.heat_flow]
+        assert y == [f"{v:g}" for v in gcc.temperatures]
+
+    def test_points_table_clears_without_streams(self, window):
+        window.tabs.setCurrentIndex(3)
+        assert window.gcc_page.points_table.rowCount() == 0
+
     def test_switch_to_gcc_tab_uses_combined_pta(self, window):
         _add(window, 100, 40, 600)
         _add(window, 25, 85, 2.5, use_cp=True)
@@ -334,6 +468,37 @@ class TestTspPage:
     def test_tsp_empty_profile(self, window):
         window.tabs.setCurrentIndex(4)
         assert window.tsp_page.curves is None
+
+    def test_legend_uses_site_terminology(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        page = window.tsp_page
+        window.tabs.setCurrentIndex(4)
+        page.utility_test_button.click()
+        page.plot_utilities_button.setChecked(True)
+        legend = page.figure.axes[0].get_legend()
+        labels = [text.get_text() for text in legend.get_texts()]
+        assert labels == [
+            "Site Source Profile (600 kW)",
+            "Site Sink Profile (150 kW)",
+            "Site Source Composite",
+            "Site Sink Composite",
+        ]
+
+    def test_composite_staircase_colors(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        page = window.tsp_page
+        window.tabs.setCurrentIndex(4)
+        page.utility_test_button.click()
+        page.plot_utilities_button.setChecked(True)
+        ax = page.figure.axes[0]
+        dotted = [line for line in ax.lines if line.get_linestyle() == ":"]
+        # The staircase with the smaller minimum energy is the source side
+        # (light blue); the other is the sink side (light red).
+        source, sink = sorted(dotted, key=lambda line: min(line.get_xdata()))
+        assert source.get_color().lower() == "#85c1e9"
+        assert sink.get_color().lower() == "#f1948a"
 
 
 class TestTspUtilities:
@@ -527,6 +692,15 @@ class TestTspUtilities:
 
 
 class TestSugccPage:
+    def test_figure_options_panel_under_sugcc_table(self, window, app):
+        window.tabs.setCurrentIndex(5)
+        app.processEvents()
+        page = window.sugcc_page
+        controls = page.controls
+        assert controls.tracker is None  # no data-point rows on this page
+        assert hasattr(controls, "export_button")
+        assert controls.y() >= page.target_table.y() + page.target_table.height()
+
     def test_sugcc_button_gated_by_tsp_shift(self, window):
         _add(window, 100, 40, 600)
         _add(window, 25, 85, 2.5, use_cp=True)
@@ -615,6 +789,30 @@ class TestSugccPage:
         dotted = [line for line in ax.lines if line.get_linestyle() == ":"]
         assert len(dotted) == 1
         assert min(dotted[0].get_xdata()) == 0.0  # cold staircase only
+
+    def test_utility_table_height_midpoint(self, window, app):
+        window.tabs.setCurrentIndex(4)
+        app.processEvents()
+        # Taller than the original 120 px, but shorter than 170 px.
+        assert window.tsp_page.utility_table.height() == 150
+
+    def test_tsp_shift_and_sugcc_share_a_row(self, window, app):
+        window.tabs.setCurrentIndex(4)
+        app.processEvents()
+        page = window.tsp_page
+        assert page.tsp_shift_button.y() == page.sugcc_button.y()
+        assert page.sugcc_button.x() > page.tsp_shift_button.x()
+
+    def test_figure_options_panel_under_tsp_buttons(self, window, app):
+        window.tabs.setCurrentIndex(4)
+        app.processEvents()
+        page = window.tsp_page
+        controls = page.controls
+        assert controls.tracker is None  # no data-point rows on this page
+        assert hasattr(controls, "export_button")
+        add_bottom = page.utility_add_button.y() + page.utility_add_button.height()
+        assert page.utility_table.y() < page.utility_add_button.y()
+        assert controls.y() >= add_bottom
 
     def test_tsp_shift_moves_cold_composite(self, window):
         _add(window, 100, 40, 600)  # hot
@@ -740,6 +938,39 @@ class TestSaving:
 
 
 class TestMoreButtons:
+    def test_every_push_button_accepts_enter(self, window):
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QPushButton
+
+        buttons = window.findChildren(QPushButton)
+        assert len(buttons) >= 20
+        # Strong focus lets Tab or a mouse click focus the button, and the
+        # auto-default flag makes Enter activate it once focused.
+        assert all(
+            button.focusPolicy() == Qt.FocusPolicy.StrongFocus
+            for button in buttons
+        )
+        assert all(button.autoDefault() for button in buttons)
+
+    def test_enter_activates_tsp_utility_add_button(self, window, app):
+        window.tabs.setCurrentIndex(4)
+        app.processEvents()  # let the tab become current before focusing
+        page = window.tsp_page
+        page.utility_add_button.setFocus()
+        app.processEvents()
+        QTest.keyClick(page.utility_add_button, Qt.Key.Key_Return)
+        assert page.utility_table.rowCount() == 1
+        assert page.utility_name_edit.hasFocus()  # handler returns focus there
+
+    def test_enter_in_utility_name_field_adds_utility(self, window):
+        window.tabs.setCurrentIndex(4)
+        page = window.tsp_page
+        page.utility_name_edit.setText("HP steam")
+        page.utility_name_edit.setFocus()
+        QTest.keyClick(page.utility_name_edit, Qt.Key.Key_Return)
+        assert page.utility_table.rowCount() == 1
+        assert page.utility_table.item(0, 0).text() == "HP steam"
+
     def test_button_loads_test_streams(self, window):
         from frontend.main_window import TEST_STREAMS
 
@@ -813,3 +1044,326 @@ class TestMoreButtons:
         window.delete_all_button.click()
         assert dialogs
         assert window.table.rowCount() == 0
+
+
+class TestFigureControls:
+    @pytest.mark.parametrize(
+        "tab_index,attr",
+        [
+            (1, "composite_page"),
+            (2, "pta_page"),
+            (3, "gcc_page"),
+        ],
+    )
+    def test_controls_match_figure_size(self, window, app, tab_index, attr):
+        window.tabs.setCurrentIndex(tab_index)
+        app.processEvents()
+        page = getattr(window, attr)
+        assert page.controls is not None
+        width, height = page.figure.get_size_inches()
+        assert page.controls.width_spin.value() == pytest.approx(width, abs=0.11)
+        assert page.controls.height_spin.value() == pytest.approx(height, abs=0.11)
+
+    def test_fit_to_tab_follows_window_size(self, window, app):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        assert controls.fit_check.isChecked()  # fit to tab is the default
+        app.processEvents()
+        w0, _ = window.composite_page.figure.get_size_inches()
+        window.resize(1600, 1100)
+        app.processEvents()
+        w1, _ = window.composite_page.figure.get_size_inches()
+        assert w1 > w0 + 1.0  # the figure grew with the window
+        # the spinners mirror the actual figure size
+        assert controls.width_spin.value() == pytest.approx(w1, abs=0.11)
+
+    def test_manual_size_when_not_fitting(self, window, app):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        controls.fit_check.setChecked(False)
+        controls.aspect_check.setChecked(False)
+        controls.width_spin.setValue(9.0)
+        controls.height_spin.setValue(6.0)
+        app.processEvents()
+        width, height = window.composite_page.figure.get_size_inches()
+        assert width == pytest.approx(9.0, abs=0.05)
+        assert height == pytest.approx(6.0, abs=0.05)
+        assert controls.width_spin.value() == pytest.approx(width, abs=0.11)
+
+    def test_aspect_ratio_when_not_fitting(self, window, app):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        controls.fit_check.setChecked(False)
+        controls.aspect_check.setChecked(False)
+        controls.width_spin.setValue(10.0)
+        controls.height_spin.setValue(6.0)
+        app.processEvents()
+        controls.aspect_check.setChecked(True)
+        controls.width_spin.setValue(8.0)
+        app.processEvents()
+        width, height = window.composite_page.figure.get_size_inches()
+        assert width == pytest.approx(8.0, abs=0.05)
+        assert height == pytest.approx(4.8, abs=0.05)  # 8 * 6 / 10
+
+    def test_reset_size_restores_defaults(self, window, app):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        controls.fit_check.setChecked(False)
+        controls.aspect_check.setChecked(False)
+        controls.width_spin.setValue(12.0)
+        controls.height_spin.setValue(8.0)
+        app.processEvents()
+        controls.reset_button.click()
+        app.processEvents()
+        width, height = window.composite_page.figure.get_size_inches()
+        assert width == pytest.approx(7.0, abs=0.05)
+        assert height == pytest.approx(5.0, abs=0.05)
+        assert not controls.fit_check.isChecked()  # pinned so the reset sticks
+
+    def test_reset_size_pta_defaults(self, window, app):
+        window.tabs.setCurrentIndex(2)
+        controls = window.pta_page.controls
+        controls.fit_check.setChecked(False)
+        controls.reset_button.click()
+        app.processEvents()
+        width, height = window.pta_page.figure.get_size_inches()
+        assert width == pytest.approx(5.5, abs=0.05)
+        assert height == pytest.approx(7.0, abs=0.05)
+
+    def test_scrollbars_as_needed(self, window):
+        from PyQt6.QtCore import Qt as _Qt
+
+        for attr in ("composite_page", "pta_page", "gcc_page"):
+            view = getattr(window, attr).canvas_view
+            assert view.horizontalScrollBarPolicy() == _Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            assert view.verticalScrollBarPolicy() == _Qt.ScrollBarPolicy.ScrollBarAsNeeded
+
+    def test_points_default_on_with_labels(self, window):
+        from matplotlib.colors import to_hex
+
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        assert controls.cursor_check.isChecked()  # data points default on
+        assert controls.points_enabled()
+        ax = window.composite_page.figure.axes[0]
+        assert {line.get_marker() for line in ax.lines} == {"x", "o"}
+        texts = [label.get_text() for label in controls.tracker.labels]
+        assert "(600, 100)" in texts
+        assert "(450, 25)" in texts
+        # markers and coordinate labels are black by default (slider at 100)
+        for line in ax.lines:
+            if line.get_marker() == "x":
+                assert to_hex(line.get_markeredgecolor()) == "#000000"
+            elif line.get_marker() == "o":
+                assert to_hex(line.get_markerfacecolor()) == "#000000"
+        assert all(to_hex(label.get_color()) == "#000000" for label in controls.tracker.labels)
+
+    def test_toggle_off_hides_markers_and_labels(self, window, app):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        controls.cursor_check.setChecked(False)
+        app.processEvents()
+        ax = window.composite_page.figure.axes[0]
+        assert all(line.get_marker() == "None" for line in ax.lines)
+        assert controls.tracker.labels == []
+        # turn it back on again
+        controls.cursor_check.setChecked(True)
+        app.processEvents()
+        ax = window.composite_page.figure.axes[0]
+        assert {line.get_marker() for line in ax.lines} == {"x", "o"}
+        assert controls.tracker.labels
+
+    def test_show_point_coordinates_on_gcc(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(3)
+        page = window.gcc_page
+        controls = page.controls
+        ax = page.figure.axes[0]
+        assert any(line.get_marker() == "x" for line in ax.lines)
+        texts = [label.get_text() for label in controls.tracker.labels]
+        # gcc points for this case: (0,100),(150,85),(487.5,40),(450,25)
+        assert "(450, 25)" in texts
+        assert "(487.5, 40)" in texts
+        # toggling off removes the gcc x markers and the labels
+        controls.cursor_check.setChecked(False)
+        assert not any(line.get_marker() == "x" for line in ax.lines)
+        assert controls.tracker.labels == []
+
+    def test_composite_labels_flip_side_by_curve(self, window):
+        _add(window, 100, 40, 600)  # hot composite: x markers
+        _add(window, 25, 85, 2.5, use_cp=True)  # cold composite: o markers
+        window.tabs.setCurrentIndex(1)
+        page = window.composite_page
+        ax = page.figure.axes[0]
+        lines = [line for line in ax.lines if line.get_marker() in ("x", "o")]
+        assert [line.get_marker() for line in lines] == ["x", "o"]
+        # tracker.labels are appended per line and per point, in plot order:
+        # hot points first, then cold points.
+        hot_count = len(lines[0].get_xdata())
+        labels = page.controls.tracker.labels
+        hot_labels = labels[:hot_count]
+        cold_labels = labels[hot_count:]
+        assert hot_labels and cold_labels
+        # hot composite labels sit to the LEFT of each point, cold labels to
+        # the RIGHT (offsets in points: dx < 0 vs dx > 0).
+        assert all(label.xyann[0] < 0 for label in hot_labels)
+        assert all(label.xyann[0] > 0 for label in cold_labels)
+
+    def test_gcc_labels_keep_default_side(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(3)
+        labels = window.gcc_page.controls.tracker.labels
+        assert labels
+        # no per-marker offsets on the gcc page: labels stay above-right
+        assert all(label.xyann[0] > 0 for label in labels)
+
+    def test_composite_labels_fully_clear_of_points(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        page = window.composite_page
+        fig = page.figure
+        fig.canvas.draw()
+        renderer = fig.canvas.get_renderer()
+        ax = fig.axes[0]
+        assert page.controls.tracker.labels
+        for label in page.controls.tracker.labels:
+            point_x = ax.transData.transform(label.xy)[0]
+            bbox = label.get_window_extent(renderer)
+            if label.xyann[0] < 0:  # hot composite: whole text left of point
+                assert bbox.x1 <= point_x
+            else:  # cold composite: whole text right of point
+                assert bbox.x0 >= point_x
+
+    def test_point_color_defaults_to_black(self, window):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        assert controls.green_slider.value() == 100
+        assert controls.point_color() == "#000000"
+        assert window.gcc_page.controls.green_slider.value() == 100
+
+    def test_point_color_slider_recolors_markers_and_labels(self, window, app):
+        from matplotlib.colors import to_hex
+
+        from frontend.figure_controls import green_ramp
+
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+
+        # far right of the ramp: black markers and black labels
+        controls.green_slider.setValue(100)
+        app.processEvents()
+        assert to_hex(controls.point_color()) == "#000000"
+        ax = window.composite_page.figure.axes[0]
+        for line in ax.lines:
+            if line.get_marker() == "x":
+                assert to_hex(line.get_markeredgecolor()) == "#000000"
+            elif line.get_marker() == "o":
+                assert to_hex(line.get_markerfacecolor()) == "#000000"
+        assert all(
+            to_hex(label.get_color()) == "#000000"
+            for label in controls.tracker.labels
+        )
+
+        # middle of the ramp: a dark green shade
+        controls.green_slider.setValue(50)
+        app.processEvents()
+        expected = green_ramp(0.5).lower()
+        assert to_hex(controls.point_color()) == expected
+        ax = window.composite_page.figure.axes[0]
+        xs = [line for line in ax.lines if line.get_marker() == "x"]
+        assert xs
+        assert to_hex(xs[0].get_markeredgecolor()) == expected
+        assert all(
+            to_hex(label.get_color()) == expected
+            for label in controls.tracker.labels
+        )
+
+    def test_point_color_slider_applies_to_gcc(self, window, app):
+        from matplotlib.colors import to_hex
+
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(3)
+        controls = window.gcc_page.controls
+        controls.green_slider.setValue(100)
+        app.processEvents()
+        ax = window.gcc_page.figure.axes[0]
+        xs = [line for line in ax.lines if line.get_marker() == "x"]
+        assert xs
+        assert to_hex(xs[0].get_markeredgecolor()) == "#000000"
+        assert all(
+            to_hex(label.get_color()) == "#000000"
+            for label in controls.tracker.labels
+        )
+
+    def test_pta_has_no_points_toggle(self, window):
+        window.tabs.setCurrentIndex(2)
+        assert window.pta_page.controls.tracker is None
+        assert not hasattr(window.pta_page.controls, "cursor_check")
+        assert not hasattr(window.pta_page.controls, "green_slider")
+
+    def test_tab_switching_with_points_enabled_does_not_crash(self, window, app):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        # points are enabled by default; bounce between the plotting tabs
+        for _ in range(8):
+            for idx in (1, 2, 3):  # composite, pta, gcc
+                window.tabs.setCurrentIndex(idx)
+                app.processEvents()
+        controls = window.composite_page.controls
+        assert controls.points_enabled()
+        assert controls.tracker.labels  # labels were re-added on the last plot
+
+    def test_export_png(self, window, tmp_path, monkeypatch):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        target = str(tmp_path / "figure.png")
+        monkeypatch.setattr(
+            "frontend.figure_controls.QFileDialog.getSaveFileName",
+            lambda *a, **k: (target, "PNG image (*.png)"),
+        )
+        window.composite_page.controls.export_button.click()
+        data = tmp_path.joinpath("figure.png").read_bytes()
+        assert data[:8] == b"\x89PNG\r\n\x1a\n"
+
+    def test_export_jpg(self, window, tmp_path, monkeypatch):
+        _add(window, 100, 40, 600)
+        _add(window, 25, 85, 2.5, use_cp=True)
+        window.tabs.setCurrentIndex(1)
+        controls = window.composite_page.controls
+        controls.format_combo.setCurrentText("JPG")
+        target = str(tmp_path / "figure.jpg")
+        monkeypatch.setattr(
+            "frontend.figure_controls.QFileDialog.getSaveFileName",
+            lambda *a, **k: (target, "JPG image (*.jpg)"),
+        )
+        controls.export_button.click()
+        data = tmp_path.joinpath("figure.jpg").read_bytes()
+        assert data[:2] == b"\xff\xd8"  # JPEG magic bytes
+
+    def test_export_appends_extension(self, window, tmp_path, monkeypatch):
+        _add(window, 100, 40, 600)
+        window.tabs.setCurrentIndex(1)
+        target = str(tmp_path / "figure")  # no extension
+        monkeypatch.setattr(
+            "frontend.figure_controls.QFileDialog.getSaveFileName",
+            lambda *a, **k: (target, "PNG image (*.png)"),
+        )
+        window.composite_page.controls.export_button.click()
+        assert tmp_path.joinpath("figure.png").exists()

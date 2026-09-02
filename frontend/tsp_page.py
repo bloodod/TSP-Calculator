@@ -3,8 +3,9 @@
 The plot shows the cold composite on the positive energy side and the hot
 composite on the negative side, both starting at energy 0. On the right, a
 narrow panel manages the site's utility streams (name + temperature): a
-short editable table above the input, with the buttons centered below and
-space at the bottom.
+tall editable table at the top, the input fields and all action buttons
+below it, and the shared figure options panel (size, fit, export) under
+the buttons.
 """
 
 from __future__ import annotations
@@ -40,8 +41,12 @@ from backend import (
     utility_staircase,
 )
 
+from .figure_controls import FigureControls, ScrollableCanvas
+
 HOT_COLOR = "#C0392B"
 COLD_COLOR = "#2471A3"
+SOURCE_COMPOSITE_COLOR = "#85C1E9"  # light blue
+SINK_COMPOSITE_COLOR = "#F1948A"  # light red
 
 # Built-in utility streams loaded by the Test button, as (name, temperature).
 TEST_UTILITIES = [
@@ -84,7 +89,8 @@ class TspPage(QWidget):
     def _build_plot(self) -> QWidget:
         self.figure = Figure(figsize=(7, 5), constrained_layout=True)
         self.canvas = FigureCanvasQTAgg(self.figure)
-        return self.canvas
+        self.canvas_view = ScrollableCanvas(self.canvas)
+        return self.canvas_view
 
     def refresh(self, tsp: TotalSiteProfile) -> None:
         """Rebuild and redraw the TSP from the profile's streams."""
@@ -165,7 +171,10 @@ class TspPage(QWidget):
                 linewidth=2.4,
                 marker="x",
                 markersize=5,
-                label=f"Hot composite ({abs(self.curves.hot.total_enthalpy):g} kW)",
+                label=(
+                    "Site Source Profile "
+                    f"({abs(self.curves.hot.enthalpy[0]):g} kW)"
+                ),
             )
         if self.curves.cold.enthalpy:
             cold_enthalpy = self.curves.cold.enthalpy
@@ -178,18 +187,27 @@ class TspPage(QWidget):
                 linewidth=2.4,
                 marker="o",
                 markersize=4,
-                label=f"Cold composite ({self.curves.cold.total_enthalpy:g} kW)",
+                label=(
+                    "Site Sink Profile "
+                    f"({self.curves.cold.total_enthalpy:g} kW)"
+                ),
             )
         ax.axvline(0.0, color="gray", linestyle="--", linewidth=0.8)
 
-        # Utility streams: thin dotted staircases tracing the composites.
+        # Site source/sink composites: thin dotted staircases tracing the
+        # source profile on the negative side and the sink profile on the
+        # positive side.
         if self.plot_utilities_button.isChecked() and (hot_steps or cold_steps):
             if hot_steps:
-                self._plot_staircase(ax, hot_steps)
+                self._plot_staircase(
+                    ax, hot_steps, "Site Source Composite", SOURCE_COMPOSITE_COLOR
+                )
             if cold_steps:
                 if shift is not None:
                     cold_steps = [(x - shift, t) for x, t in cold_steps]
-                self._plot_staircase(ax, cold_steps)
+                self._plot_staircase(
+                    ax, cold_steps, "Site Sink Composite", SINK_COMPOSITE_COLOR
+                )
 
         if shift is not None:
             ax.text(
@@ -217,14 +235,16 @@ class TspPage(QWidget):
         ax.legend(frameon=False)
         self.canvas.draw()
 
-    def _plot_staircase(self, ax, steps: list[tuple[float, float]]) -> None:
+    def _plot_staircase(
+        self, ax, steps: list[tuple[float, float]], label: str, color: str
+    ) -> None:
         ax.plot(
             [p[0] for p in steps],
             [p[1] for p in steps],
-            color="#2C3E50",
+            color=color,
             linestyle=":",
             linewidth=1.3,
-            label="Utility streams",
+            label=label,
         )
 
     # ------------------------------------------------------------------
@@ -239,7 +259,7 @@ class TspPage(QWidget):
         title.setStyleSheet("font-weight: bold;")
         panel.addWidget(title)
 
-        # Short editable table of utility streams, above the input.
+        # Editable table of utility streams at the top of the panel.
         self.utility_table = QTableWidget(0, 2)
         self.utility_table.setHorizontalHeaderLabels(["Name", "T (\u00b0C)"])
         self.utility_table.horizontalHeader().setSectionResizeMode(
@@ -255,7 +275,7 @@ class TspPage(QWidget):
             QAbstractItemView.EditTrigger.DoubleClicked
             | QAbstractItemView.EditTrigger.EditKeyPressed
         )
-        self.utility_table.setFixedHeight(120)
+        self.utility_table.setFixedHeight(150)
         self.utility_table.itemChanged.connect(self._on_utility_cell_changed)
         panel.addWidget(self.utility_table)
 
@@ -268,33 +288,35 @@ class TspPage(QWidget):
         form.addRow("T (\u00b0C):", self.utility_temp_spin)
         panel.addLayout(form)
 
-        # Buttons: add/test sit in the middle, plot and delete at the bottom.
-        panel.addStretch(1)
-
+        # All buttons sit below the table, in a single group.
         self.utility_add_button = QPushButton("Add utility")
         self.utility_add_button.clicked.connect(self._on_utility_add_clicked)
+        # Enter in the name field adds the stream (like the main input panel).
+        self.utility_name_edit.returnPressed.connect(
+            self.utility_add_button.click
+        )
         panel.addWidget(self.utility_add_button)
 
         self.utility_test_button = QPushButton("Test")
         self.utility_test_button.clicked.connect(self._on_utility_test_clicked)
         panel.addWidget(self.utility_test_button)
 
-        panel.addStretch(1)
-
         self.plot_utilities_button = QPushButton("Plot utility streams")
         self.plot_utilities_button.setCheckable(True)
         self.plot_utilities_button.toggled.connect(self._on_plot_utilities_toggled)
         panel.addWidget(self.plot_utilities_button)
 
+        # TSP Shift and SUGCC share one row (SUGCC is enabled by the shift).
+        shift_row = QHBoxLayout()
         self.tsp_shift_button = QPushButton("TSP Shift")
         self.tsp_shift_button.setCheckable(True)
         self.tsp_shift_button.toggled.connect(self._on_tsp_shift_toggled)
-        panel.addWidget(self.tsp_shift_button)
-
+        shift_row.addWidget(self.tsp_shift_button)
         self.sugcc_button = QPushButton("SUGCC")
         self.sugcc_button.setEnabled(False)  # only after the TSP shift
         self.sugcc_button.clicked.connect(self.sugcc_requested.emit)
-        panel.addWidget(self.sugcc_button)
+        shift_row.addWidget(self.sugcc_button)
+        panel.addLayout(shift_row)
 
         delete_row = QHBoxLayout()
         self.utility_delete_button = QPushButton("Delete stream")
@@ -306,6 +328,17 @@ class TspPage(QWidget):
         )
         delete_row.addWidget(self.utility_delete_all_button)
         panel.addLayout(delete_row)
+
+        # Same figure options as on the composite curves page: width/height,
+        # fit to tab, aspect ratio, reset size and image export.
+        self.controls = FigureControls(
+            self.figure,
+            canvas_host=self.canvas_view,
+            default_size=(7.0, 5.0),
+        )
+        panel.addWidget(self.controls)
+
+        panel.addStretch(1)
         return panel
 
     # -- handlers -------------------------------------------------------

@@ -49,6 +49,7 @@ from backend import (
 )
 
 from .composite_page import CompositePage
+from .enter_keys import make_buttons_enter_activatable
 from .gcc_page import GccPage
 from .pta_page import PtaPage
 from .sugcc_page import SugccPage
@@ -89,8 +90,8 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Total Site Profile Calculator")
-        self.resize(1000, 620)
-        self.setMinimumSize(860, 520)
+        self.resize(1000, 720)
+        self.setMinimumSize(860, 560)
 
         self.tsp = TotalSiteProfile()  # backend model kept in sync with the table
         self._updating = False  # guards itemChanged against refresh recursion
@@ -130,6 +131,9 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         self.statusBar().showMessage("Ready")
         self._build_menu()
+        # Every push button (now and on any page added later under this
+        # window) accepts keyboard focus, so Enter activates it.
+        make_buttons_enter_activatable(self)
 
     def _build_menu(self) -> None:
         file_menu = self.menuBar().addMenu("&File")

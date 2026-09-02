@@ -16,6 +16,8 @@ from PyQt6.QtWidgets import QComboBox, QHBoxLayout, QLabel, QVBoxLayout, QWidget
 
 from backend import ProblemTable, TotalSiteProfile, problem_table
 
+from .figure_controls import FigureControls, ScrollableCanvas
+
 HOT_FILL = "#FADBD8"  # light red
 COLD_FILL = "#D6EAF8"  # light blue
 COMBINED_FILL = "#EAECEE"  # light gray
@@ -48,7 +50,18 @@ class PtaPage(QWidget):
 
         self.figure = Figure(figsize=(5.5, 7), constrained_layout=True)
         self.canvas = FigureCanvasQTAgg(self.figure)
-        layout.addWidget(self.canvas, 1)
+
+        body = QHBoxLayout()
+        body.setSpacing(8)
+        self.canvas_view = ScrollableCanvas(self.canvas)
+        body.addWidget(self.canvas_view, 1)
+        self.controls = FigureControls(
+            self.figure,
+            canvas_host=self.canvas_view,
+            default_size=(5.5, 7.0),
+        )
+        body.addWidget(self.controls, 0)
+        layout.addLayout(body, 1)
 
         self.tsp: TotalSiteProfile | None = None
         self.result: ProblemTable | None = None

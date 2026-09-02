@@ -9,7 +9,8 @@ plot shows those bars against temperature.
 To the right of the plot, a table gives the cogeneration targets: each
 expansion zone (named after its bounding utilities, e.g. "g/f") with its
 temperature span, net heat Q and cogeneration target
-W = 0.00133 * delta T * Q, plus a total row.
+W = 0.00133 * delta T * Q, plus a total row. Below the table sit the same
+figure options as on the composite curves page (size, fit and export).
 """
 
 from __future__ import annotations
@@ -43,6 +44,8 @@ from backend import (
     utility_staircase,
 )
 
+from .figure_controls import FigureControls, ScrollableCanvas
+
 BAR_COLOR = "#117A65"
 BAR_FILL = "#D5F5E3"
 
@@ -72,7 +75,8 @@ class SugccPage(QWidget):
     def _build_plot(self) -> QWidget:
         self.figure = Figure(figsize=(7, 5), constrained_layout=True)
         self.canvas = FigureCanvasQTAgg(self.figure)
-        return self.canvas
+        self.canvas_view = ScrollableCanvas(self.canvas)
+        return self.canvas_view
 
     def _build_targets_panel(self) -> QWidget:
         panel = QWidget()
@@ -106,6 +110,15 @@ class SugccPage(QWidget):
         note.setStyleSheet("color: gray;")
         note.setWordWrap(True)
         layout.addWidget(note)
+
+        # Same figure options as on the composite curves page: width/height,
+        # fit to tab, aspect ratio, reset size and image export.
+        self.controls = FigureControls(
+            self.figure,
+            canvas_host=self.canvas_view,
+            default_size=(7.0, 5.0),
+        )
+        layout.addWidget(self.controls)
         return panel
 
     # ------------------------------------------------------------------
