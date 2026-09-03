@@ -50,3 +50,7 @@ The single-file executable is written to `dist\TSP.exe`. Copy it to any Windows 
 | `assets/` | Application icon |
 | `tests/` | Unit + GUI tests (pytest) |
 | `main.py` | Application entry point |
+
+## License
+
+[MIT](LICENSE) — free to use, modify and share; see the license file for details.
