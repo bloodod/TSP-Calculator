@@ -1,5 +1,7 @@
 # TSP Calculator — Total Site Profile Calculator
 
+<img width="256" height="256" alt="icon_source" src="https://github.com/user-attachments/assets/7ee6e292-d19f-41b8-965c-28decd30a26e" />
+
 A desktop tool for **Total Site heat integration analysis**, built with Python and PyQt6. Enter the site's hot and cold streams, and the program builds the composite curves, problem table, grand composite curve, total site profiles and the site utility grand composite curve (SUGCC) with its cogeneration targets.
 
 ## Features
